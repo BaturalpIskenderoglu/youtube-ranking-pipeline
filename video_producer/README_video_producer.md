@@ -46,5 +46,5 @@ Message format is given below:
     "video_id": str,
     "channel_id": str,
     "publish_date": str,
-    "langauge": str
+    "language": str
 }

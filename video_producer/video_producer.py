@@ -59,7 +59,7 @@ for chunk in pd.read_csv(dataset_path, chunksize=chunk_size):
             # "video_tags":,
             # "kind":,
             "publish_date": str(row.publish_date),
-            "langauge": str(row.langauge)
+            "language": str(row.langauge) # 'langauge' is misspelled in the source data, typo handled 
         }
 
         video_producer.send(topic=topic, key=partition_key, value=message_json)

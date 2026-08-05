@@ -1,0 +1,43 @@
+apiVersion: batch/v1
+kind: Job
+
+metadata:
+  name: video-producer
+  namespace: video_pipeline
+
+spec:
+  completions: 5
+  parallelism: 5
+  completionMode: Indexed
+  backoffLimit: 3
+
+  template:
+    spec:
+      restartPolicy: Never
+
+      containers:
+
+      - name: video_producer
+        image: video-producer:latest
+        imagePullPolicy: Never
+
+        env:
+        - name: BROKER_ADDRESSES 
+          value: kafka_1:9092
+        - name: CHUNK_SIZE
+          value: 300
+        - name: TOPIC
+          value: youtube_videos
+        - name: CHUNK_READ_DELAY_SECOND
+          value: 1
+        - name: MESSAGE_LINGER_DELAY_MS
+          value: 1000
+        
+        volumeMounts:
+        - name: dataset
+          mountPath: /app
+
+      volumes:
+      - name: dataset
+        persistentVolumeClaim:
+          claimName: video_dataset

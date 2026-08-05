@@ -28,8 +28,9 @@ print("Producer addresses are:")
 for address in broker_addresses:
     print(address)
 
+PRODUCER_INDEX = os.getenv("JOB_COMPLETION_INDEX")
 
-dataset_path = "/app/dataset.csv"
+dataset_path = f"/app/dataset_partition-{PRODUCER_INDEX}.csv"
 chunk_size = int(os.getenv("CHUNK_SIZE", 1000))
 topic = os.getenv("TOPIC","youtube_videos")
 chunk_read_delay_second = float(os.getenv("CHUNK_READ_DELAY_SECOND",0.1))

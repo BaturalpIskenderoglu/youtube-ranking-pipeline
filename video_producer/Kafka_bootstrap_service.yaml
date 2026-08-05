@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: kafka-bootstrap
+  namespace: video_pipeline
+
+  spec:
+
+    selector:
+      app: kafka
+    
+    ports:
+
+    - name: broker
+      port: 9092
+      targetPort: broker
+    
+    type: ClusterIP

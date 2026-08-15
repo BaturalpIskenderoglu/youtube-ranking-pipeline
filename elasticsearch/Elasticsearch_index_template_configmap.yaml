@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: elasticsearch-index-template
+  namespace: video-pipeline
+
+data:
+
+  index_template.json: |
+    {
+      "index_patterns": ["youtube_videos*"],
+      "template": {
+        "settings": {
+          "number_of_shards": 3,
+          "number_of_replicas": 1,
+          "refresh_interval": "5s"
+        },
+        "mappings": {
+          "properties": {
+            "video_id":     { "type": "keyword" },
+            "channel_id":   { "type": "keyword" },
+            "language":     { "type": "keyword" },
+
+            "title": {
+              "type": "text",
+              "fields": { "keyword": { "type": "keyword", "ignore_above": 256 } }
+            },
+
+            "channel_name": {
+              "type": "text",
+              "fields": { "keyword": { "type": "keyword", "ignore_above": 256 } }
+            },
+
+            "snapshot_date": { "type": "date" },
+            "publish_date":  { "type": "date" },
+
+            "view_count":    { "type": "long" },
+            "like_count":    { "type": "long" },
+            "comment_count": { "type": "long" },
+            "age_in_days":   { "type": "integer" },
+
+            "engagement_score": { "type": "double" },
+            "engagement_rate":  { "type": "double" },
+            "freshness_rate":   { "type": "double" }
+          }
+        }
+      }
+    }

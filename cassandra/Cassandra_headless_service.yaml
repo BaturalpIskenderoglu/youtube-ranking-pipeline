@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Service
+
+# This is both the governing service of the StatefulSet and the address
+# Spark connects to. It is headless on purpose: the DNS name "cassandra"
+# resolves to every pod IP at once, which is exactly the list of contact
+# points the Cassandra driver wants.
+
+metadata:
+  name: cassandra
+  namespace: video-pipeline
+
+spec:
+  clusterIP: None
+
+  # keep the pod DNS names resolvable while a node is still bootstrapping
+  publishNotReadyAddresses: true
+
+  selector:
+    app: cassandra
+
+  ports:
+
+  - name: cql
+    port: 9042
+    targetPort: cql
+
+  - name: intra-node
+    port: 7000
+    targetPort: intra-node

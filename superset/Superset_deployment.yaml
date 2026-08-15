@@ -1,0 +1,128 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: superset
+  namespace: video-pipeline
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: superset
+
+  template:
+    metadata:
+      labels:
+        app: superset
+
+    spec:
+
+      initContainers:
+
+      # Runs the migrations and creates the admin user. All three commands are
+      # safe to run again, create-admin is the only one that complains when the
+      # user is already there, which is why its failure is swallowed.
+      - name: bootstrap
+
+        image: youtube-pipeline/superset:1.0
+        imagePullPolicy: IfNotPresent
+
+        command:
+          - sh
+          - -c
+          - |
+            # No pg_isready in this image, and the wait must not depend on the
+            # postgres driver either, so it is a plain stdlib socket check.
+            # The db service only publishes ready endpoints, so a successful
+            # connect here means postgres is actually accepting queries.
+            until python -c "
+            import os, socket
+            socket.create_connection((os.environ['METADB_HOST'], 5432), timeout=3).close()
+            " > /dev/null 2>&1; do
+              echo "metadata db is not ready yet, waiting..."
+              sleep 5
+            done
+
+            superset db upgrade
+
+            superset fab create-admin \
+              --username admin \
+              --firstname Admin \
+              --lastname User \
+              --email admin@video-pipeline.local \
+              --password "$ADMIN_PASSWORD" || echo "admin user already exists, skipping"
+
+            superset init
+
+        envFrom:
+        - secretRef:
+            name: superset-secrets
+
+        env:
+        - name: METADB_HOST
+          value: superset-db
+
+        - name: METADB_NAME
+          value: superset
+
+      containers:
+
+      - name: superset
+
+        # build it first, see README_superset.md
+        image: youtube-pipeline/superset:1.0
+        imagePullPolicy: IfNotPresent
+
+        command:
+          - /usr/bin/run-server.sh
+
+        ports:
+        - containerPort: 8088
+          name: http
+
+        envFrom:
+        - secretRef:
+            name: superset-secrets
+
+        env:
+
+        - name: METADB_HOST
+          value: superset-db
+
+        - name: METADB_NAME
+          value: superset
+
+        # Do not remove. Kubernetes injects SUPERSET_PORT=tcp://<ip>:8088 for
+        # the Service that happens to be called "superset", and run-server.sh
+        # binds gunicorn to ${SUPERSET_PORT:-8088}. Without this override the
+        # container dies with "'tcp' is not a valid port number".
+        - name: SUPERSET_PORT
+          value: "8088"
+
+        # puts the bundled 7.x Elasticsearch client into compatibility mode so
+        # it accepts a 9.x server, see the Dockerfile
+        - name: ELASTIC_CLIENT_APIVERSIONING
+          value: "1"
+
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+          periodSeconds: 10
+          failureThreshold: 30
+
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          periodSeconds: 15
+          timeoutSeconds: 5
+
+        resources:
+          requests:
+            cpu: 250m
+            memory: 1Gi
+          limits:
+            memory: 2Gi

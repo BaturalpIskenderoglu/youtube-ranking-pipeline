@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: StatefulSet
+
+# Superset's own metadata store. Nothing from the pipeline is kept here,
+# only dashboards, charts, saved queries and users. One replica is enough,
+# but it still gets a volume so the dashboards survive a restart.
+
+metadata:
+  name: superset-db
+  namespace: video-pipeline
+
+spec:
+  serviceName: superset-db
+
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: superset-db
+
+  template:
+    metadata:
+      labels:
+        app: superset-db
+
+    spec:
+
+      containers:
+
+      - name: postgres
+
+        image: postgres:16-alpine
+        imagePullPolicy: IfNotPresent
+
+        ports:
+        - containerPort: 5432
+          name: postgres
+
+        env:
+
+        - name: POSTGRES_DB
+          value: superset
+
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: superset-secrets
+              key: METADB_USER
+
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: superset-secrets
+              key: METADB_PASSWORD
+
+        # the official image mounts a volume at /var/lib/postgresql/data and
+        # then complains it is not empty, so keep the data one level down
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+
+        readinessProbe:
+          exec:
+            command:
+              - /bin/sh
+              - -c
+              - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+          initialDelaySeconds: 10
+          periodSeconds: 10
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 512Mi
+
+        volumeMounts:
+        - name: superset-db-storage
+          mountPath: /var/lib/postgresql/data
+
+  volumeClaimTemplates:
+
+    - metadata:
+        name: superset-db-storage
+
+      spec:
+        accessModes:
+          - ReadWriteOnce
+
+        resources:
+          requests:
+            storage: 2Gi

@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Service
+
+# Governing service of the StatefulSet. Only used by the Elasticsearch nodes
+# themselves to find each other, clients should use Elasticsearch_service.yaml.
+
+metadata:
+  name: elasticsearch-headless
+  namespace: video-pipeline
+
+spec:
+  clusterIP: None
+
+  # nodes have to resolve each other during cluster formation, which happens
+  # before any of them is ready
+  publishNotReadyAddresses: true
+
+  selector:
+    app: elasticsearch
+
+  ports:
+
+  - name: http
+    port: 9200
+    targetPort: http
+
+  - name: transport
+    port: 9300
+    targetPort: transport

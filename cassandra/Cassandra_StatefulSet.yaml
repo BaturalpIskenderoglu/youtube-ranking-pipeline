@@ -1,0 +1,137 @@
+apiVersion: apps/v1
+kind: StatefulSet
+
+metadata:
+  name: cassandra
+  namespace: video-pipeline
+
+spec:
+  serviceName: cassandra
+
+  replicas: 3
+
+  # default policy, but be explicit about it: Cassandra nodes must
+  # bootstrap one at a time, never in parallel
+  podManagementPolicy: OrderedReady
+
+  selector:
+    matchLabels:
+      app: cassandra
+
+  template:
+    metadata:
+      labels:
+        app: cassandra
+
+    spec:
+
+      # nodetool drain needs a while on a node that has data
+      terminationGracePeriodSeconds: 300
+
+      containers:
+
+      - name: cassandra
+
+        image: cassandra:4.1.7
+        imagePullPolicy: IfNotPresent
+
+        ports:
+        - containerPort: 9042
+          name: cql
+
+        - containerPort: 7000
+          name: intra-node
+
+        env:
+
+        - name: CASSANDRA_CLUSTER_NAME
+          value: youtube-ranking-cluster
+
+        - name: CASSANDRA_ENDPOINT_SNITCH
+          value: GossipingPropertyFileSnitch
+
+        - name: CASSANDRA_DC
+          value: dc1
+
+        - name: CASSANDRA_RACK
+          value: rack1
+
+        # first two pods are enough as seeds, a seed list does not have to
+        # contain every node
+        - name: CASSANDRA_SEEDS
+          value: cassandra-0.cassandra.video-pipeline.svc.cluster.local,cassandra-1.cassandra.video-pipeline.svc.cluster.local
+
+        - name: MAX_HEAP_SIZE
+          value: 1G
+
+        - name: HEAP_NEWSIZE
+          value: 256M
+
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+
+        command:
+          - sh
+          - -c
+          - |
+            # broadcast the stable pod DNS name instead of the pod IP,
+            # otherwise gossip breaks every time a pod is rescheduled
+            export CASSANDRA_BROADCAST_ADDRESS="${POD_NAME}.cassandra.video-pipeline.svc.cluster.local"
+
+            exec docker-entrypoint.sh cassandra -f
+
+        lifecycle:
+          preStop:
+            exec:
+              command:
+                - nodetool
+                - drain
+
+        # statusbinary prints "running" once the CQL port is actually
+        # serving, which is the only thing Spark cares about.
+        # a cold start takes about a minute, joining an existing ring
+        # takes considerably longer, hence the generous failureThreshold
+        startupProbe:
+          exec:
+            command:
+              - /bin/sh
+              - -c
+              - nodetool statusbinary | grep -q running
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 40
+
+        readinessProbe:
+          exec:
+            command:
+              - /bin/sh
+              - -c
+              - nodetool statusbinary | grep -q running
+          periodSeconds: 15
+          timeoutSeconds: 10
+
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+          limits:
+            memory: 3Gi
+
+        volumeMounts:
+        - name: cassandra-storage
+          mountPath: /var/lib/cassandra
+
+  volumeClaimTemplates:
+
+    - metadata:
+        name: cassandra-storage
+
+      spec:
+        accessModes:
+          - ReadWriteOnce
+
+        resources:
+          requests:
+            storage: 5Gi

@@ -5,15 +5,15 @@ metadata:
   name: kafka-bootstrap
   namespace: video-pipeline
 
-  spec:
+spec:
 
-    selector:
-      app: kafka
-    
-    ports:
+  selector:
+    app: kafka
+  
+  ports:
 
-    - name: broker
-      port: 9092
-      targetPort: broker
-    
-    type: ClusterIP
+  - name: broker
+    port: 9092
+    targetPort: broker
+  
+  type: ClusterIP

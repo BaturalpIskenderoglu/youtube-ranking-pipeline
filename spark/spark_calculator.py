@@ -1,6 +1,6 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, from_json, log10
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DateType
+from pyspark.sql.functions import col, from_json, lit, log10, when
+from pyspark.sql.types import LongType, StructType, StructField, StringType
 import os
 
 # spark configs
@@ -78,9 +78,9 @@ mesaj_struct = StructType([
             # "weekly_movement":,
             StructField("snapshot_date", StringType(), False),
             # "country":,
-            StructField("view_count", IntegerType(), False),
-            StructField("like_count", IntegerType(), False),
-            StructField("comment_count", IntegerType(), False),
+            StructField("view_count", LongType(), False),
+            StructField("like_count", LongType(), False),
+            StructField("comment_count", LongType(), False),
             # "description":,
             # "thumbnail_url":,
             StructField("video_id", StringType(), False),
@@ -98,13 +98,13 @@ TOPIC = os.getenv("TOPIC","youtube_videos")
 # BROKER_ADDRESSES = producer1_address, producer2_address, producer3_address 
 broker_addresses_str = os.getenv("BROKER_ADDRESSES", "localhost:9092")
 
-bootstrapservers = ""
+bootstrapservers = ",".join(address.strip() for address in broker_addresses_str.split(","))
 
-for index, address in enumerate(broker_addresses_str.split(","), start=1):
-    if index != 1:
-        bootstrapservers += f",broker{index}:{address.strip()}"
-    else:
-        bootstrapservers += f"broker{index}:{address.strip()}"
+# for index, address in enumerate(broker_addresses_str.split(","), start=1):
+#     if index != 1:
+#         bootstrapservers += f",broker{index}:{address.strip()}"
+#     else:
+#         bootstrapservers += f"broker{index}:{address.strip()}"
 
 # read kafka stream
 kafka_df = spark.readStream.format("kafka") \
@@ -131,9 +131,16 @@ video_df_1 = video_df \
 video_df_final = video_df_1.withColumn("engagement_score", 
                                    (log10(col("view_count") + 1) * 0.5) + 
                                    (log10(col("like_count") + 1) * 0.3) + 
-                                   (log10(col("comment_count") + 1) * 0.2)) \
-                        .withColumn("engagement_rate", (col("like_count") + col("comment_count")) / col("view_count")) \
-                        .withColumn("freshness_rate", col("engagement_score") / log10(col("age_in_days")))
+                                   (log10(col("comment_count") + 1) * 0.2)
+                            ) \
+                            .withColumn("engagement_rate",
+                                        when( col("view_count") > 0,
+                            
+                                            (col("like_count") + col("comment_count")) / col("view_count")
+                                        ) \
+                                        .otherwise(lit(0.0)
+                            )) \
+                            .withColumn("freshness_rate", col("engagement_score") / log10(col("age_in_days") + 2))
 
 PROCESSING_TIME_SECONDS = os.getenv("PROCESSING_TIME_SECONDS", '10')
 

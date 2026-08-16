@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: spark-driver
+  namespace: video-pipeline
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: spark-driver
+
+  template:
+    metadata:
+      labels:
+        app: spark-driver
+    
+    spec:
+      containers:
+
+      - name: spark-driver
+
+        image: spark-calculator:latest
+        imagePullPolicy: Never
+
+        env:
+
+        - name: MASTER_NODE_ADDRESS
+          value: spark://spark-master:7077
+
+        - name: NUMBER_OF_CORES_PER_EXECUTOR
+          value: "2"
+
+        - name: BROKER_ADDRESSES
+          value: kafka-0.kafka.video_pipeline.svc.cluster.local:9092,kafka-1.kafka.video_pipeline.svc.cluster.local:9092,kafka-2.kafka.video_pipeline.svc.cluster.local:9092
+
+        - name: TOPIC
+          value: youtube_videos
+
+        - name: CASSANDRA_HOST
+          value: cassandra
+
+        - name: CASSANDRA_PORT
+          value: "9042"
+
+        - name: CASSANDRA_KEYSPACE_NAME
+          value: ????
+
+        - name: CASSANDRA_TABLE_NAME
+          value: ????
+
+        - name: ELASTICSEARCH_NODES
+          value: ????
+
+        - name: ELASTICSEARCH_PORT
+          value: ????
+
+        - name: ELASTICSEARCH_INDEX
+          value: ????
+
+        - name: PROCESSING_TIME_SECONDS
+          value: "10"
+
+        volumeMounts:
+
+        - name: checkpoint
+          mountPath: /app/checkpoint
+
+      
+      volumes:
+
+      - name: checkpoint
+        persistentVolumeClaim:
+          claimName: spark-checkpoint
+ 

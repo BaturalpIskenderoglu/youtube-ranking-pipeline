@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: spark-worker
+  namespace: video-pipeline
+
+spec:
+  replicas: 3
+
+  selector:
+    matchLabels:
+      app: spark-worker
+
+  template:
+    metadata:
+      labels:
+        app: spark-worker
+
+    spec:
+      containers:
+      - name: spark-worker
+
+        image: apache/spark:3.5.0
+        imagePullPolicy: IfNotPresent
+
+        command:
+        - /opt/spark/sbin/start-worker.sh
+
+        args:
+        - spark://spark-master:7077
+        - --cores
+        - 2
+        - --memory
+        - 2g
+        - --webui-port
+        - "8081"
+
+        ports:
+        
+        - name: web-ui
+          containerPort: 8081

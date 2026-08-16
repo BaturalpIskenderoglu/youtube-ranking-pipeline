@@ -1,13 +1,11 @@
-FROM python:3.10-slim
+FROM apache/spark:3.5.0
 
-RUN apt-get update && apt-get install -y \
-    openjdk-21-jre-headless \
-    && rm -rf /var/lib/apt/lists/*
+USER root
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir pyspark==3.5.0
+COPY spark_calculator.py /app/spark_calculator.py
 
-COPY spark_calculator.py .
+USER spark
 
-CMD ["python", "spark_calculator.py"]
+CMD ["python3", "app/spark_calculator.py"]

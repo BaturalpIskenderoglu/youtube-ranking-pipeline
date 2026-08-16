@@ -60,6 +60,15 @@ spec:
 
         - name: KAFKA_LISTENERS
           value: PLAINTEXT://:9092,CONTROLLER://:29093
+
+        - name: KAFKA_NUM_PARTITIONS
+          value: "5"
+        
+        - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+          value: "3"
+
+        - name: KAFKA_LOG_DIRS
+          value: /var/lib/kafka/data
         
         
         - name: POD_NAME

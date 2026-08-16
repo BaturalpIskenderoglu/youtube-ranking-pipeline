@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: spark-master
+  namesapce: video-pipeline
+
+  spec:
+    replicas: 1
+
+    selector:
+      matchLabels:
+        app: spark-master
+
+    template:
+      metadata:
+        labels:
+          app: spark-master
+      
+      spec:
+        containers:
+
+        - name: spark-master
+
+        image: apache/spark:3.5.0
+        imagePullPolicy: IfNotPresent
+
+        command:
+        - /opt/spark/bin/start-master.sh
+
+        args:
+        - --host
+        - spark-master
+        - --port
+        - "7077"
+        - --webui-port
+        - "8080"
+
+        ports:
+
+        - name: spark
+          containerPort: 7077
+
+        - name: web-ui
+          containerPort: 8080

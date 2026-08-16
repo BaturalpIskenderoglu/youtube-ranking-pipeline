@@ -23,19 +23,19 @@ spec:
 
         env:
         - name: BROKER_ADDRESSES 
-          value: kafka_1:9092
+          value: kafka-bootstrap:9092
         - name: CHUNK_SIZE
-          value: 300
+          value: "300"
         - name: TOPIC
           value: youtube_videos
         - name: CHUNK_READ_DELAY_SECOND
-          value: 1
+          value: "1"
         - name: MESSAGE_LINGER_DELAY_MS
-          value: 1000
+          value: "1000"
         
         volumeMounts:
         - name: dataset
-          mountPath: /app
+          mountPath: /data
 
       volumes:
       - name: dataset

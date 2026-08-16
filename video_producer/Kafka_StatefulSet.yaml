@@ -3,7 +3,7 @@ kind: StatefulSet
 
 metadata:
   name: kafka
-  namespace: video_pipeline
+  namespace: video-pipeline
 
 spec:
   serviceName: kafka

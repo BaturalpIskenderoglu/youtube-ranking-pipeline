@@ -2,8 +2,8 @@ apiVersion: v1
 kind: PersistenVolumeClaim
 
 metadata:
-  name: video_dataset
-  namespace: video_pipeline
+  name: video-dataset
+  namespace: video-pipeline
 
 spec:
   accessModes:

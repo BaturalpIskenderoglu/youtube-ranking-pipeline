@@ -3,7 +3,7 @@ kind: Job
 
 metadata:
   name: video-producer
-  namespace: video_pipeline
+  namespace: video-pipeline
 
 spec:
   completions: 5
@@ -17,7 +17,7 @@ spec:
 
       containers:
 
-      - name: video_producer
+      - name: video-producer
         image: video-producer:latest
         imagePullPolicy: Never
 
@@ -40,4 +40,4 @@ spec:
       volumes:
       - name: dataset
         persistentVolumeClaim:
-          claimName: video_dataset
+          claimName: video-dataset

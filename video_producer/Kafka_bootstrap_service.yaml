@@ -3,7 +3,7 @@ kind: Service
 
 metadata:
   name: kafka-bootstrap
-  namespace: video_pipeline
+  namespace: video-pipeline
 
   spec:
 

@@ -3,34 +3,59 @@ kind: Deployment
 
 metadata:
   name: spark-master
-  namesapce: video-pipeline
+  namespace: video-pipeline
 
-  spec:
-    replicas: 1
+spec:
+  replicas: 1
 
-    selector:
-      matchLabels:
+  selector:
+    matchLabels:
+      app: spark-master
+
+  template:
+    metadata:
+      labels:
         app: spark-master
 
-    template:
-      metadata:
-        labels:
-          app: spark-master
-      
-      spec:
-        containers:
+    spec:
+      # Kubernetes injects an env var per Service into every pod, so the
+      # spark-master Service produces SPARK_MASTER_PORT=tcp://<ip>:7077.
+      # MasterArguments parses that env var as an integer before it looks at
+      # --port, so the master dies with a NumberFormatException. Nothing here
+      # discovers anything through those variables, we use DNS, so turning the
+      # injection off is the cleanest fix.
+      enableServiceLinks: false
 
-        - name: spark-master
+      containers:
 
-        image: apache/spark:3.5.0
-        imagePullPolicy: IfNotPresent
+      - name: spark-master
 
+        # same image as the workers and the driver, so every JVM in the cluster
+        # has the connector jars on an identical classpath
+        image: spark-calculator:latest
+        imagePullPolicy: Never
+
+        # start-master.sh launches the master through spark-daemon.sh and then
+        # returns, which would end the container. spark-class runs the master
+        # in the foreground instead, so the pod stays up.
         command:
-        - /opt/spark/bin/start-master.sh
+        - /opt/spark/bin/spark-class
+
+        # Bind to the pod's own IP, not to the service name. The master binds
+        # whatever --host resolves to, and at startup the service has no ready
+        # endpoint yet, so the name does not resolve and it dies with
+        # UnresolvedAddressException. The pod IP is always available and is
+        # what workers reach through the headless service anyway.
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
 
         args:
+        - org.apache.spark.deploy.master.Master
         - --host
-        - spark-master
+        - $(POD_IP)
         - --port
         - "7077"
         - --webui-port
@@ -43,3 +68,16 @@ metadata:
 
         - name: web-ui
           containerPort: 8080
+
+        readinessProbe:
+          tcpSocket:
+            port: spark
+          initialDelaySeconds: 10
+          periodSeconds: 10
+
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            memory: 1Gi

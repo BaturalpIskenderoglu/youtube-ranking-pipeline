@@ -61,16 +61,12 @@ spec:
         - name: KAFKA_LISTENERS
           value: PLAINTEXT://:9092,CONTROLLER://:29093
 
+        # caps Spark's consumer parallelism, so it has to be at least the
+        # highest spark-worker replica count used in the scaling experiment
         - name: KAFKA_NUM_PARTITIONS
           value: "5"
-        
-        - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
-          value: "3"
 
-        - name: KAFKA_LOG_DIRS
-          value: /var/lib/kafka/data
-        
-        
+
         - name: POD_NAME
           valueFrom:
             fieldRef:

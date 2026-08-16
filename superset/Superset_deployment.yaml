@@ -101,10 +101,16 @@ spec:
         - name: SUPERSET_PORT
           value: "8088"
 
-        # puts the bundled 7.x Elasticsearch client into compatibility mode so
-        # it accepts a 9.x server, see the Dockerfile
-        - name: ELASTIC_CLIENT_APIVERSIONING
-          value: "1"
+        # Do NOT set ELASTIC_CLIENT_APIVERSIONING here. It was tried on the
+        # assumption that the 7.x client bundled with elasticsearch-dbapi would
+        # need compatibility headers to speak to a 9.x server. It does not, and
+        # the flag actively breaks it: it makes the client request
+        # "compatible-with=7" while Elasticsearch 9 only accepts 8, so every
+        # call to the native search API fails with
+        #   media_type_header_exception: Invalid media-type value on headers
+        # The SQL endpoint still works, so a connection test passes and only
+        # dataset creation fails, which makes it look unrelated. Verified by
+        # running the same query with and without the variable.
 
         startupProbe:
           httpGet:

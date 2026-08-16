@@ -6,7 +6,10 @@ metadata:
   namespace: video-pipeline
 
 spec:
-  replicas: 3
+  # Experiment 1 scales this:  kubectl scale deployment/spark-worker --replicas=N
+  # Start at 1, the cluster does not have room for more until the other
+  # components are sized down.
+  replicas: 1
 
   selector:
     matchLabels:
@@ -18,25 +21,45 @@ spec:
         app: spark-worker
 
     spec:
+      # same reason as the master, see spark-master-deployment.yaml
+      enableServiceLinks: false
+
       containers:
       - name: spark-worker
 
-        image: apache/spark:3.5.0
-        imagePullPolicy: IfNotPresent
+        # see spark-master-deployment.yaml: one image everywhere so executors
+        # deserialize connector lambdas against the same classes as the driver
+        image: spark-calculator:latest
+        imagePullPolicy: Never
 
+        # same reason as the master: run in the foreground, not as a daemon
         command:
-        - /opt/spark/sbin/start-worker.sh
+        - /opt/spark/bin/spark-class
 
+        # 1 core so parallelism tracks the replica count directly, but a 1g
+        # heap. 512m was tried and is not viable: an executor could not finish
+        # a 10,000 row batch in 15 minutes, while the same work at 1g goes
+        # through in seconds. The batch shuffles for the ranking dedup and then
+        # writes five sinks, and below roughly 1g the executor spends its time
+        # in GC rather than on the work.
         args:
+        - org.apache.spark.deploy.worker.Worker
         - spark://spark-master:7077
         - --cores
-        - 2
+        - "1"
         - --memory
-        - 2g
+        - "1g"
         - --webui-port
         - "8081"
 
         ports:
-        
+
         - name: web-ui
           containerPort: 8081
+
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            memory: 1600Mi

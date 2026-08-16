@@ -93,9 +93,43 @@ The partition key is `video_id` and the clustering key is `snapshot_date`
 descending. So all snapshots of one video sit in one partition and the newest
 one is the first row, which makes "latest state of this video" a single read.
 
-Only the raw `videos` table is created here. The per language and per channel
-ranking tables should be added to the same ConfigMap once the Spark job starts
-writing them, since in Cassandra you model one table per query.
+## Ranking views
+
+Three more tables hold the rankings:
+
+| Table | Partition key | Answers |
+|:---|:---|:---|
+| `videos_by_score` | `(snapshot_date)` | top videos overall on a day |
+| `videos_by_language` | `(language, snapshot_date)` | top videos in a language |
+| `videos_by_channel` | `(channel_id, snapshot_date)` | top videos of a channel |
+
+All three cluster on `engagement_score DESC, video_id ASC`.
+
+Nothing computes a rank. The ranking *is* the clustering order: Cassandra keeps
+each partition sorted by score as rows are written, so top-k is a
+single-partition read with a `LIMIT` and no sorting at query time.
+
+```
+SELECT engagement_score, title
+FROM youtube_video_pipeline.videos_by_language
+WHERE language='tr' AND snapshot_date='2026-07-08'
+LIMIT 10;
+```
+
+This matters because ranking inside the stream would not work. Spark sees one
+micro-batch at a time, so any rank computed there would order the handful of
+rows that arrived in those few seconds rather than the whole corpus. Pushing
+the ordering into the primary key keeps the stream stateless and still gives a
+correct global ranking.
+
+`video_id` is the last clustering column only so two videos with an identical
+score do not overwrite one another.
+
+The Spark job deduplicates to the highest-scoring observation per video per day
+before writing these tables. The dataset carries one row per video *per
+country*, so without that step a single popular video occupies every slot in
+the top ten. Deduplication happens within a micro-batch, so a video reappearing
+in a later batch is inserted again under its new score.
 
 ## Deploying
 

@@ -16,5 +16,9 @@ spec:
   persistentVolumeReclaimPolicy: Retain
 
   hostPath:
-    path: /home/baturalp/datasets
-    # change this path with respect to your own dataset path
+    path: /opt/video-dataset
+    # change this path with respect to your own dataset path.
+    # it must hold dataset_partition-0.csv .. dataset_partition-4.csv, one per
+    # pod of the indexed producer Job, and it must be a path on the node
+    # itself. on WSL keep it on the native filesystem rather than under
+    # /mnt/c, the 9p mount is far too slow to stream from.

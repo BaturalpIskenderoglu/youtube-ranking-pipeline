@@ -16,12 +16,16 @@ spec:
     metadata:
       labels:
         app: spark-driver
-    
+
     spec:
+      # same reason as the master, see spark-master-deployment.yaml
+      enableServiceLinks: false
+
       containers:
 
       - name: spark-driver
 
+        # built locally, see spark/Dockerfile
         image: spark-calculator:latest
         imagePullPolicy: Never
 
@@ -30,11 +34,18 @@ spec:
         - name: MASTER_NODE_ADDRESS
           value: spark://spark-master:7077
 
+        # Must not exceed the --cores a single worker advertises. Standalone
+        # mode places an executor inside one worker, so asking for 2 cores
+        # while each worker offers 1 means no executor is ever launched: the
+        # app registers, sits there requesting resources, and no batch ever
+        # runs. There is no error, it just waits.
         - name: NUMBER_OF_CORES_PER_EXECUTOR
-          value: "2"
+          value: "1"
 
+        # the bootstrap service, same address the producer uses. the client
+        # discovers the rest of the brokers from it.
         - name: BROKER_ADDRESSES
-          value: kafka-0.kafka.video_pipeline.svc.cluster.local:9092,kafka-1.kafka.video_pipeline.svc.cluster.local:9092,kafka-2.kafka.video_pipeline.svc.cluster.local:9092
+          value: kafka-bootstrap:9092
 
         - name: TOPIC
           value: youtube_videos
@@ -46,32 +57,58 @@ spec:
           value: "9042"
 
         - name: CASSANDRA_KEYSPACE_NAME
-          value: ????
+          value: youtube_video_pipeline
 
         - name: CASSANDRA_TABLE_NAME
-          value: ????
+          value: videos
 
         - name: ELASTICSEARCH_NODES
-          value: ????
+          value: elasticsearch
 
         - name: ELASTICSEARCH_PORT
-          value: ????
+          value: "9200"
 
         - name: ELASTICSEARCH_INDEX
-          value: ????
+          value: youtube_videos
 
         - name: PROCESSING_TIME_SECONDS
           value: "10"
+
+        # Bounds each micro-batch so batches are comparable between runs of the
+        # scaling experiment. Remove it for normal operation, where draining
+        # the whole backlog at once is what you want.
+        - name: MAX_OFFSETS_PER_TRIGGER
+          value: "10000"
+
+        # executors connect back to the driver, so it has to advertise an
+        # address they can reach. the pod IP is routable inside the cluster.
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+
+        - name: SPARK_DRIVER_HOST
+          value: $(POD_IP)
+
+        # spark.jars.packages resolves through ivy at startup and needs a
+        # writable home, which the base image does not give the spark user
+        - name: HOME
+          value: /tmp
 
         volumeMounts:
 
         - name: checkpoint
           mountPath: /app/checkpoint
 
-      
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            memory: 2Gi
+
       volumes:
 
       - name: checkpoint
         persistentVolumeClaim:
           claimName: spark-checkpoint
- 

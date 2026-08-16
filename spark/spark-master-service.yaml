@@ -6,9 +6,18 @@ metadata:
   namespace: video-pipeline
 
 spec:
+  # Headless on purpose. The master binds to whatever --host resolves to, and a
+  # pod cannot bind a Service ClusterIP, so a normal virtual IP makes it die
+  # with "Cannot assign requested address". Headless resolves the name straight
+  # to the pod IP, which it can bind and also advertise to workers.
+  clusterIP: None
+
+  # so the name resolves while the master is still coming up
+  publishNotReadyAddresses: true
+
   selector:
     app: spark-master
-  
+
   ports:
   - name: spark
     port: 7077

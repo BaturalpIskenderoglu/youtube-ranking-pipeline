@@ -1,6 +1,9 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 
+# Structured Streaming keeps its offsets and commit log here. Without a volume
+# the driver replays from the earliest offset on every restart.
+
 metadata:
   name: spark-checkpoint
   namespace: video-pipeline
@@ -8,7 +11,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  
+
   resources:
     requests:
-      storage: 1Gİ
+      storage: 1Gi

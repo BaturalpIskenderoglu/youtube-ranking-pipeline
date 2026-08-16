@@ -32,3 +32,62 @@ data:
         freshness_rate    double,
         PRIMARY KEY ((video_id), snapshot_date)
     ) WITH CLUSTERING ORDER BY (snapshot_date DESC);
+
+    -- Ranking views.
+    --
+    -- There is no rank computed anywhere. Ranking within a micro-batch would
+    -- only order the handful of rows that arrived in that window, not the
+    -- corpus, so instead the ranking is the physical row order: partition on
+    -- the dimension being ranked plus the day, cluster on engagement_score
+    -- descending, and Cassandra keeps the partition sorted as rows arrive.
+    -- Top-k is then a single-partition read with a LIMIT, no sort at query
+    -- time and no aggregation in the stream.
+    --
+    -- video_id is the last clustering column purely to keep two videos with an
+    -- identical score from overwriting each other.
+
+    CREATE TABLE IF NOT EXISTS youtube_video_pipeline.videos_by_score (
+        snapshot_date     timestamp,
+        engagement_score  double,
+        video_id          text,
+        title             text,
+        channel_name      text,
+        language          text,
+        view_count        bigint,
+        like_count        bigint,
+        comment_count     bigint,
+        engagement_rate   double,
+        freshness_rate    double,
+        PRIMARY KEY ((snapshot_date), engagement_score, video_id)
+    ) WITH CLUSTERING ORDER BY (engagement_score DESC, video_id ASC);
+
+    CREATE TABLE IF NOT EXISTS youtube_video_pipeline.videos_by_language (
+        language          text,
+        snapshot_date     timestamp,
+        engagement_score  double,
+        video_id          text,
+        title             text,
+        channel_name      text,
+        view_count        bigint,
+        like_count        bigint,
+        comment_count     bigint,
+        engagement_rate   double,
+        freshness_rate    double,
+        PRIMARY KEY ((language, snapshot_date), engagement_score, video_id)
+    ) WITH CLUSTERING ORDER BY (engagement_score DESC, video_id ASC);
+
+    CREATE TABLE IF NOT EXISTS youtube_video_pipeline.videos_by_channel (
+        channel_id        text,
+        snapshot_date     timestamp,
+        engagement_score  double,
+        video_id          text,
+        title             text,
+        channel_name      text,
+        language          text,
+        view_count        bigint,
+        like_count        bigint,
+        comment_count     bigint,
+        engagement_rate   double,
+        freshness_rate    double,
+        PRIMARY KEY ((channel_id, snapshot_date), engagement_score, video_id)
+    ) WITH CLUSTERING ORDER BY (engagement_score DESC, video_id ASC);

@@ -126,14 +126,27 @@ Things to keep in mind when building the charts:
 
 ## Notes
 
-Superset talks to Elasticsearch over the `_sql` endpoint through
-`elasticsearch-dbapi`. That package still pins the 7.x Elasticsearch client
-library, and a 7.x client refuses to talk to a 9.x server by default, it
-decides the server is "not Elasticsearch" and stops. Setting
-`ELASTIC_CLIENT_APIVERSIONING=1` puts the client into compatibility mode and it
-works. It is worth knowing this is the fragile part of the setup, it is the only
-place where a version bump on the Elasticsearch side can break something that
-is not obviously related.
+Superset reaches Elasticsearch through `elasticsearch-dbapi`, which still pins
+the 7.x client library while the server is 9.x. That combination works as it
+is. **Do not set `ELASTIC_CLIENT_APIVERSIONING`.**
+
+That variable was added on the assumption that a 7.x client would need
+compatibility headers for a 9.x server. The opposite is true. With it set, the
+client asks for `compatible-with=7`, Elasticsearch 9 accepts only 8, and every
+call to the native search API fails with:
+
+```
+media_type_header_exception: Invalid media-type value on headers [Accept, Content-Type]
+```
+
+What makes this one nasty is that queries go through the `_sql` endpoint, which
+is unaffected. So the connection test passes, SQL Lab works, and only creating a
+dataset fails, with a Superset error that says nothing about media types. The
+same query was run with and without the variable to confirm which way round it
+goes.
+
+This is still the most version-sensitive part of the stack, just not for the
+reason originally assumed.
 
 Cassandra is deliberately not wired into Superset. There is no maintained
 SQLAlchemy dialect for it and the usual way to do it is to put Trino in front,

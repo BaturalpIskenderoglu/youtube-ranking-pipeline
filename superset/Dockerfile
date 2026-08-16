@@ -2,10 +2,10 @@ FROM apache/superset:4.1.1
 
 USER root
 
-# The stock image has no Elasticsearch driver. elasticsearch-dbapi talks to
-# the _sql endpoint and still pins the 7.x client library, which by default
-# refuses to speak to a 9.x server. ELASTIC_CLIENT_APIVERSIONING (set in the
-# Deployment) puts the client into compatibility mode so it works.
+# The stock image has no Elasticsearch driver. elasticsearch-dbapi talks to the
+# _sql endpoint and still pins the 7.x client library. That talks to a 9.x
+# server as-is; do not add ELASTIC_CLIENT_APIVERSIONING to "help" it, see the
+# note in Superset_deployment.yaml.
 # python -m pip rather than plain pip, so the packages land in the same
 # interpreter superset runs under whatever the base image does with its paths
 #

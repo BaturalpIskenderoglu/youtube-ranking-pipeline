@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+
+# This is the name Spark and Superset connect to. It only points at ready
+# pods, so a node that is restarting is taken out of rotation automatically.
+
+metadata:
+  name: elasticsearch
+  namespace: video-pipeline
+
+spec:
+  type: ClusterIP
+
+  selector:
+    app: elasticsearch
+
+  ports:
+
+  - name: http
+    port: 9200
+    targetPort: http

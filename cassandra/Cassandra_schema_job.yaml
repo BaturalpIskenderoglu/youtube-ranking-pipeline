@@ -1,0 +1,47 @@
+apiVersion: batch/v1
+kind: Job
+
+# The Spark Cassandra connector does not create keyspaces or tables, it only
+# writes into tables that already exist. Run this job once after the
+# StatefulSet is up and before the Spark job starts.
+
+metadata:
+  name: cassandra-schema-init
+  namespace: video-pipeline
+
+spec:
+  backoffLimit: 10
+
+  template:
+    spec:
+      restartPolicy: OnFailure
+
+      containers:
+
+      - name: cqlsh
+
+        image: cassandra:4.1.7
+        imagePullPolicy: IfNotPresent
+
+        command:
+          - sh
+          - -c
+          - |
+            # the job can start before the ring is up, so keep retrying
+            until cqlsh cassandra 9042 -e "describe cluster" > /dev/null 2>&1; do
+              echo "cassandra is not answering yet, waiting..."
+              sleep 10
+            done
+
+            cqlsh cassandra 9042 -f /schema/schema.cql
+
+            echo "schema applied"
+
+        volumeMounts:
+        - name: schema
+          mountPath: /schema
+
+      volumes:
+      - name: schema
+        configMap:
+          name: cassandra-schema

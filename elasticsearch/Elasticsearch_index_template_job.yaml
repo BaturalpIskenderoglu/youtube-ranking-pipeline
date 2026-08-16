@@ -1,0 +1,51 @@
+apiVersion: batch/v1
+kind: Job
+
+# Elasticsearch would happily create the index on the first write from Spark,
+# but then the dates come out as text and the scores as float. Registering the
+# template up front means the index is mapped correctly whenever it appears.
+# Run this before the Spark job.
+
+metadata:
+  name: elasticsearch-index-template
+  namespace: video-pipeline
+
+spec:
+  backoffLimit: 10
+
+  template:
+    spec:
+      restartPolicy: OnFailure
+
+      containers:
+
+      - name: curl
+
+        image: curlimages/curl:8.11.0
+        imagePullPolicy: IfNotPresent
+
+        command:
+          - sh
+          - -c
+          - |
+            until curl -sf "http://elasticsearch:9200/_cluster/health?wait_for_status=yellow&timeout=30s" > /dev/null; do
+              echo "elasticsearch is not ready yet, waiting..."
+              sleep 10
+            done
+
+            curl -sS -X PUT "http://elasticsearch:9200/_index_template/youtube_videos" \
+              -H "Content-Type: application/json" \
+              --data-binary @/template/index_template.json \
+              --fail-with-body
+
+            echo
+            echo "index template registered"
+
+        volumeMounts:
+        - name: template
+          mountPath: /template
+
+      volumes:
+      - name: template
+        configMap:
+          name: elasticsearch-index-template

@@ -1,0 +1,129 @@
+apiVersion: apps/v1
+kind: StatefulSet
+
+metadata:
+  name: elasticsearch
+  namespace: video-pipeline
+
+spec:
+  serviceName: elasticsearch-headless
+
+  replicas: 3
+
+  selector:
+    matchLabels:
+      app: elasticsearch
+
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+
+    spec:
+
+      # the image runs as uid 1000, this makes the mounted volume writable
+      # for that user
+      securityContext:
+        fsGroup: 1000
+
+      initContainers:
+
+      # Elasticsearch refuses to start if this is lower than 262144.
+      # minikube and kind already ship a high enough value most of the time,
+      # but on a plain node it has to be raised.
+      - name: raise-max-map-count
+
+        image: busybox:1.36
+        imagePullPolicy: IfNotPresent
+
+        command:
+          - sh
+          - -c
+          - sysctl -w vm.max_map_count=262144
+
+        securityContext:
+          privileged: true
+          runAsUser: 0
+
+      containers:
+
+      - name: elasticsearch
+
+        # matches org.elasticsearch:elasticsearch-spark-30_2.12:9.4.3
+        # that the Spark job pulls, do not bump one without the other
+        image: docker.elastic.co/elasticsearch/elasticsearch:9.4.3
+        imagePullPolicy: IfNotPresent
+
+        ports:
+        - containerPort: 9200
+          name: http
+
+        - containerPort: 9300
+          name: transport
+
+        env:
+
+        - name: cluster.name
+          value: youtube-ranking
+
+        - name: node.name
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+
+        # the headless service resolves to all pods, so this single entry is
+        # enough for discovery
+        - name: discovery.seed_hosts
+          value: elasticsearch-headless
+
+        - name: cluster.initial_master_nodes
+          value: elasticsearch-0,elasticsearch-1,elasticsearch-2
+
+        # no TLS and no auth, this is a closed cluster inside the namespace.
+        # if this ever leaves the lab it has to be turned back on.
+        - name: xpack.security.enabled
+          value: "false"
+
+        - name: bootstrap.memory_lock
+          value: "false"
+
+        - name: ES_JAVA_OPTS
+          value: -Xms1g -Xmx1g
+
+        startupProbe:
+          httpGet:
+            path: /_cluster/health?local=true
+            port: http
+          periodSeconds: 10
+          failureThreshold: 30
+
+        readinessProbe:
+          httpGet:
+            path: /_cluster/health?local=true
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+          limits:
+            memory: 3Gi
+
+        volumeMounts:
+        - name: elasticsearch-storage
+          mountPath: /usr/share/elasticsearch/data
+
+  volumeClaimTemplates:
+
+    - metadata:
+        name: elasticsearch-storage
+
+      spec:
+        accessModes:
+          - ReadWriteOnce
+
+        resources:
+          requests:
+            storage: 5Gi

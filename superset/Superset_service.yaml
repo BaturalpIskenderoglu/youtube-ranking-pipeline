@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+
+# NodePort so the dashboards can be opened from outside the cluster without
+# an ingress controller. On minikube:  minikube service superset -n video-pipeline
+
+metadata:
+  name: superset
+  namespace: video-pipeline
+
+spec:
+  type: NodePort
+
+  selector:
+    app: superset
+
+  ports:
+
+  - name: http
+    port: 8088
+    targetPort: http
+    nodePort: 30088
